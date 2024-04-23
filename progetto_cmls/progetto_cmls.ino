@@ -78,7 +78,13 @@ void updateState(){
    state[curr].pos[0];
    state[curr].pos[1];
    state[curr].pos[2];
-    // curvall - oldval
+    // curvall - oldval, forse andrà diviso per un numero piccolo
+  state[curr].vel[0] = state[!curr].vel[0] + acel[(cur_sens * 3 + 0)] - acel[(!cur_sen * 3 + 0)];
+  state[curr].vel[1] = state[!curr].vel[1] + acel[(cur_sens * 3 + 1)] - acel[(!cur_sen * 3 + 1)];
+  state[curr].vel[2] = state[!curr].vel[2] + acel[(cur_sens * 3 + 2)] - acel[(!cur_sen * 3 + 2)];
+  state[curr].pos[0] = state[!curr].pos[0] +  state[curr].vel[0] -  state[!curr].vel[0];
+  state[curr].pos[1] = state[!curr].pos[1] +  state[curr].vel[1] -  state[!curr].vel[1];
+  state[curr].pos[2] = state[!curr].pos[2] +  state[curr].vel[2] -  state[!curr].vel[2];
 
   curr = !curr;
 };
