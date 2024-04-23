@@ -8,9 +8,15 @@ typedef struct {
   int16_t dir_vec[3]; // 1 0 0
 } state_t; // state containing the current position velocity and orientation vectors
 
-int16_t acel[3], gyro[3], init_g[3]; // sensor data
-uint8_t curr = 0; // index to deduce the current state (treated as boolean)
+typedef struct {
+  int16_t v[3];
+} Vec3_t;
+
+int16_t acel[6], gyro[6], init_g[3]; // sensor data
+uint8_t curr = 0, cur_sen = 1; // index to deduce the current state (treated as boolean)
 state_t state[2]; // current and previous state (used for calculations)
+
+Vec3_t accellerazione[2];
 
 void Xrot(float_t angle, int16_t vect[3]) { // pitch rotation matrix
     int8_t oldvec[3];
@@ -55,13 +61,14 @@ void Stateinit(state_t s){
 }
 
 void getInertialData(){ //prende i dati dei sensori e li mette nei corrispettivi vettori
-  acel[0] = Wire.read() << 8 | Wire.read(); // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)
-  acel[1] = Wire.read() << 8 | Wire.read(); // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
-  acel[2] = Wire.read() << 8 | Wire.read(); // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
-  gyro[0] = Wire.read() << 8 | Wire.read(); // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
-  gyro[1] = Wire.read() << 8 | Wire.read(); // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
-  gyro[2] = Wire.read() << 8 | Wire.read(); // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
-  
+  cur_sens = !cur_sens;
+
+  acel[(cur_sens * 3 + 0)] = Wire.read() << 8 | Wire.read(); // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)
+  acel[(cur_sens * 3 + 1)] = Wire.read() << 8 | Wire.read(); // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
+  acel[(cur_sens * 3 + 2)] = Wire.read() << 8 | Wire.read(); // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
+  gyro[(cur_sens * 3 + 0)] = Wire.read() << 8 | Wire.read(); // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
+  gyro[(cur_sens * 3 + 1)] = Wire.read() << 8 | Wire.read(); // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
+  gyro[(cur_sens * 3 + 2)] = Wire.read() << 8 | Wire.read(); // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
 }
 
 void updateState(){
