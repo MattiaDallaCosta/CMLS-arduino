@@ -62,13 +62,12 @@ void Stateinit(state_t s){
 
 void getInertialData(){ //prende i dati dei sensori e li mette nei corrispettivi vettori
   cur_sens = !cur_sens;
-
-  acel[(cur_sens * 3 + 0)] = Wire.read() << 8 | Wire.read(); // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)
-  acel[(cur_sens * 3 + 1)] = Wire.read() << 8 | Wire.read(); // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
-  acel[(cur_sens * 3 + 2)] = Wire.read() << 8 | Wire.read(); // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
-  gyro[(cur_sens * 3 + 0)] = Wire.read() << 8 | Wire.read(); // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
-  gyro[(cur_sens * 3 + 1)] = Wire.read() << 8 | Wire.read(); // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
-  gyro[(cur_sens * 3 + 2)] = Wire.read() << 8 | Wire.read(); // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
+  acel[(cur_sens * 3 + 0)] = (Wire.read() << 8 | Wire.read())/16384.0; // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)
+  acel[(cur_sens * 3 + 1)] = (Wire.read() << 8 | Wire.read())/16384.0; // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
+  acel[(cur_sens * 3 + 2)] = (Wire.read() << 8 | Wire.read())/16384.0; // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
+  gyro[(cur_sens * 3 + 0)] = (Wire.read() << 8 | Wire.read())/131 + 0.56; // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
+  gyro[(cur_sens * 3 + 1)] = (Wire.read() << 8 | Wire.read())/131 - 2; // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L) 
+  gyro[(cur_sens * 3 + 2)] = (Wire.read() << 8 | Wire.read())/131 + 0.79; // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
 }
 
 void updateState(){
@@ -93,7 +92,7 @@ void updateState(){
 void setup() {
   Serial.begin(115200);
   Serial.println("Initializing bluetooth");
-  BLEMidiServer.begin("Basic MIDI device");
+  BLEMidiServer.begin("MI.MU gloves dei poveri");
   Serial.println("Waiting for connections...");
   //BLEMidiServer.enableDebugging();  // Uncomment if you want to see some debugging output from the library
 }
