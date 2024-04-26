@@ -11,7 +11,7 @@ typedef struct {
 } state_t;                                                    // state containing the current position velocity and orientation vectors
 
 float_t acel[6], gyro[6], init_g[3];                          // sensor data
-uint8_t curr = 0,                                             // index to deduce the current state (treated as boolean)
+uint8_t curr = 0;                                             // index to deduce the current state (treated as boolean)
 uint32_t time[2];
 state_t state[2];                                             // current and previous state (used for calculations)
 
@@ -66,9 +66,9 @@ void matTrans(float_t out[3], float_t in[3]) {                            // tra
 // ---- PHYSICAL OPERATIONS ----
 
 void stateInit(state_t s) {                                               // initializes the state variables for the given state_t variable
-   memset(s.pos, 0, 6);
-   memset(s.vel, 0, 6);
-   memset(s.dir_mat, 0, 18);
+   memset(s.pos, 0, 3*sizeof(float_t));
+   memset(s.vel, 0, 3*sizeof(float_t));
+   memset(s.dir_mat, 0, 9*sizeof(float_t));
    s.dir_mat[0] = 1;
    s.dir_mat[4] = 1;
    s.dir_mat[8] = 1;
@@ -132,6 +132,12 @@ void setup() {
 
   stateInit(state[0]);
   stateInit(state[1]);
+
+  memset(0, acel, 6*sizeof(float_t));
+  memset(0, gyro, 6*sizeof(float_t));
+  memset(0, init_g, 3*sizeof(float_t));
+  memset(0, time, 2*sizeof(uint32_t));
+
   float_t elapsed = 0;
   int16_t i = 0;
   while (elapsed < 1){                                                    // initializing the gravity vector by getting data for a second and averaging it
