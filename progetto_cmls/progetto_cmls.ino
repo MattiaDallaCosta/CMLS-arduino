@@ -34,7 +34,18 @@ void eul2Rotm(float_t eul[3], float rotm[9]) {                // define rotation
 };
 
 void rotm2Eul(float_t rotm[9], float_t eul[3]){
-  // TODO
+    // Calcola l'angolo di pitch
+  eul[1] = -asin(rotm[2]); // sin(-pitch) = -rotm[2]
+
+  // Calcola l'angolo di yaw e roll
+  if (cos(eul[1]) != 0) {
+    eul[0] = atan2(rotm[5] / cos(eul[1]), rotm[8] / cos(eul[1])); // roll
+    eul[2] = atan2(rotm[1] / cos(eul[1]), rotm[0] / cos(eul[1])); // yaw
+  } else {
+    // Situazione singolare, pitch = +-90 gradi
+    eul[0] = atan2(rotm[3], rotm[4]); // roll arbitrario
+    eul[2] = 0; // yaw arbitrario
+  }
 }
 
 void matMul(float_t out[9], float_t delta[9], float_t old_mat[9]) { // matrix matrix multiplication
@@ -117,8 +128,8 @@ void updateState() {
 // touch Interrupt
 
 void gotTouchEvent(){
-  if (touch[!t_c] != touch[t_c]) {
-    touch[t_c] = !touch[t_c];
+  if (touch[!c_t] != touch[c_t]) {
+    touch[c_t] = !touch[c_t];
     test_low = !test_low;
     // Touch ISR will be inverted: Lower <--> Higher than the Threshold after ISR event is noticed
     touchInterruptSetThresholdDirection(test_low);
