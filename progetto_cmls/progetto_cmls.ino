@@ -3,6 +3,8 @@
 #include <Wire.h>
 
 #define TOUCH 2
+#define SDA 26
+#define SCL 27
 
 //the b-frame is the frame of the body while the e-frame is the frame of the environament
 
@@ -149,6 +151,7 @@ void gotTouchEvent(){
 void setup() {
   Serial.begin(115200);
   Serial.println("Initializing bluetooth");
+  Wire.begin(SDA,SCL);
 
   BLEMidiServer.begin("MI.MU gloves dei poveri");
   Serial.print("Waiting for connections");
