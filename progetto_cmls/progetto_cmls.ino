@@ -2,13 +2,13 @@
 #include <BLEMidi.h>
 #include <Wire.h>
 
-// #define LED 4
+#define TOUCH 2
 
 //the b-frame is the frame of the body while the e-frame is the frame of the environament
 
 typedef struct {
   float_t pos[3] = {0, 0, 0}, vel[3] = {0, 0, 0};
-  float_t dir_mat[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};                                         // rotation matrix of the b-frame in relation to the e-frame initialized as [[1 0 0],[0 1 0],[0 0 1]]
+  float_t dir_mat[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};                                       // rotation matrix of the b-frame in relation to the e-frame initialized as [[1 0 0],[0 1 0],[0 0 1]]
 } state_t;                                                    // state containing the current position velocity and orientation vectors
 
 float_t acel[3] = {0, 0, 0}, gyro[3] = {0, 0, 0}, init_g[3] = {0, 0, 0};                          // sensor data
@@ -16,8 +16,10 @@ bool curr = 0;                                             // index to deduce th
 uint32_t t[2];
 state_t state[2];                                             // current and previous state (used for calculations)
 
-bool test_low = 1, c_t = 0, touch[2] = {0, 0};
-uint32_t threshold = 55;
+int threshold = 40;
+bool touchActive = false;
+bool lastTouchActive = false;
+bool testingLower = true;
 
 // ---- MATRIX OPERATIONS ----
 
@@ -128,11 +130,19 @@ void updateState() {
 // touch Interrupt
 
 void gotTouchEvent(){
-  if (touch[!c_t] != touch[c_t]) {
-    touch[c_t] = !touch[c_t];
-    test_low = !test_low;
+  if (lastTouchActive != testingLower) {
+    touchActive = !touchActive;
+    testingLower = !testingLower;
     // Touch ISR will be inverted: Lower <--> Higher than the Threshold after ISR event is noticed
-    touchInterruptSetThresholdDirection(test_low);
+    touchInterruptSetThresholdDirection(testingLower);
+    if(lastTouchActive != touchActive){
+    lastTouchActive = touchActive;
+    if(touchActive){
+      Serial.println("  ---- Touch was Pressed"); // note on and other stuff
+    } else {
+      Serial.println("  ---- Touch was Released"); // note off and other stuff
+    }
+  }
   }
 }
 
@@ -141,12 +151,15 @@ void setup() {
   Serial.println("Initializing bluetooth");
 
   BLEMidiServer.begin("MI.MU gloves dei poveri");
-  Serial.println("Waiting for connections...");
-  while(!BLEMidiServer.isConnected()) delay(100);
-  Serial.println("Bluetooth connected.");
+  Serial.print("Waiting for connections");
+  while(!BLEMidiServer.isConnected()) {
+    Serial.print(".");
+    delay(1000);
+  }
+  Serial.println("\n Bluetooth connected.");
 
-  touchAttachInterrupt(T2, gotTouchEvent, threshold);
-  touchInterruptSetThresholdDirection(test_low);
+  touchAttachInterrupt(TOUCH, gotTouchEvent, threshold);
+  touchInterruptSetThresholdDirection(testingLower);
 
   Serial.print("Starting gravity estimation hold your hand still for 1 second.");
   float_t elapsed = 0;
@@ -171,13 +184,9 @@ void setup() {
 }
 
 void loop() {
-  if(touch[!c_t] != touch[c_t]){
-    if(touch[c_t]){
-      Serial.println("  ---- Touch was Pressed"); // note on and other stuff
-    } else {
-      Serial.println("  ---- Touch was Released"); // note off and other stuff
-    }
-    c_t = !c_t;
+  while(!BLEMidiServer.isConnected()) {
+    Serial.print(".");
+    delay(1000);
   }
   if(BLEMidiServer.isConnected()) {     // If we've got a connection, we send an A4 during one second, at full velocity (127)
     Serial.println("connected");
