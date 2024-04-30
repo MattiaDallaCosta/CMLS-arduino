@@ -8,8 +8,8 @@ Questo codice Arduino è progettato per implementare un sistema di tracciamento 
 1. **Rappresentazione dello Stato**: Il codice definisce una struttura di dati per memorizzare lo stato corrente del dispositivo, includendo la posizione, la velocità e l'orientamento.
 2. **Sensori e Lettura dei Dati**: Utilizzando un accelerometro e un giroscopio, il codice legge costantemente i dati sensoriali per determinare le variazioni nella posizione e nell'orientamento del dispositivo nel tempo.
 3. **Calcolo della Gravità**: Durante l'inizializzazione, il codice stima la forza di gravità per compensare gli effetti gravitazionali sui dati dell'accelerometro.
-4. **Interruzione del Tocco**: Viene utilizzato un sensore di tocco per rilevare gli eventi di tocco sul dispositivo e attivare azioni di conseguenza.
-5. **Comunicazione MIDI Bluetooth**: Il codice stabilisce una connessione Bluetooth e comunica tramite il protocollo MIDI per inviare segnali musicali o comandi a dispositivi esterni compatibili con MIDI.
+4. **Interruzione del Tocco**: Viene utilizzato un sensore di tocco per rilevare gli eventi di tocco sul dispositivo e attivare azioni di conseguenza, nel nostro caso manderà la relativa nota.
+5. **Comunicazione MIDI Bluetooth**: Il codice stabilisce una connessione Bluetooth e comunica tramite il protocollo MIDI.
 
 ### Workflow Tipico:
 1. **Inizializzazione**: Durante l'avvio, il codice inizializza i sensori, calcola la gravità iniziale e stabilisce la connessione Bluetooth.
