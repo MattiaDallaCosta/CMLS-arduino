@@ -2,6 +2,22 @@
 
 # Descrizione del Codice Arduino
 
+Questo codice Arduino è progettato per implementare un sistema di tracciamento del movimento utilizzando un accelerometro e un giroscopio. Il sistema è in grado di rilevare variazioni nella posizione, nella velocità e nell'orientamento del dispositivo a cui è collegato.
+
+### Funzionalità Principali:
+1. **Rappresentazione dello Stato**: Il codice definisce una struttura di dati per memorizzare lo stato corrente del dispositivo, includendo la posizione, la velocità e l'orientamento.
+2. **Sensori e Lettura dei Dati**: Utilizzando un accelerometro e un giroscopio, il codice legge costantemente i dati sensoriali per determinare le variazioni nella posizione e nell'orientamento del dispositivo nel tempo.
+3. **Calcolo della Gravità**: Durante l'inizializzazione, il codice stima la forza di gravità per compensare gli effetti gravitazionali sui dati dell'accelerometro.
+4. **Interruzione del Tocco**: Viene utilizzato un sensore di tocco per rilevare gli eventi di tocco sul dispositivo e attivare azioni di conseguenza, nel nostro caso manderà la relativa nota.
+5. **Comunicazione MIDI Bluetooth**: Il codice stabilisce una connessione Bluetooth e comunica tramite il protocollo MIDI.
+
+### Workflow Tipico:
+1. **Inizializzazione**: Durante l'avvio, il codice inizializza i sensori, calcola la gravità iniziale e stabilisce la connessione Bluetooth.
+2. **Aggiornamento Continuo dello Stato**: Il codice legge costantemente i dati dai sensori e aggiorna lo stato del dispositivo in base alle variazioni rilevate.
+3. **Rilevamento del Tocco**: Quando viene rilevato un tocco sul sensore, il codice attiva azioni di conseguenza, come la trasmissione di segnali MIDI o l'avvio di altre funzionalità.
+4. **Comunicazione Bluetooth MIDI**: Quando la connessione Bluetooth è attiva, il codice invia periodicamente segnali MIDI a dispositivi esterni compatibili.
+
+
 ## Librerie Utilizzate
 - `Arduino.h`: Libreria standard di Arduino.
 - `BLEMidi.h`: Libreria per la comunicazione MIDI via Bluetooth.
