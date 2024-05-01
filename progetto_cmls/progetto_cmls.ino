@@ -3,11 +3,20 @@
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
 #include <Wire.h>
+#include <1euroFilter.h>
 
 #define TOUCH 2
 #define SDA 21
 #define SCL 22
 #define MPU 0x68
+
+#define FREQ_A 1
+#define MIN_FREQ_A 1
+#define BETA_A 0
+
+#define FREQ_G 1
+#define MIN_FREQ_G 1
+#define BETA_G 0
 //the b-frame is the frame of the body while the e-frame is the frame of the environament
 
 typedef struct {
@@ -26,6 +35,12 @@ bool lastTouchActive = false;
 bool testingLower = true;
 
 Adafruit_MPU6050 mpu;
+static OneEuroFilter a0;
+static OneEuroFilter a1;
+static OneEuroFilter a2;
+static OneEuroFilter g0;
+static OneEuroFilter g1;
+static OneEuroFilter g2;
 
 // ---- MATRIX OPERATIONS ----
 
@@ -88,14 +103,6 @@ void matTrans(float_t out[3], float_t in[3]) {                            // tra
 
 // ---- PHYSICAL OPERATIONS ----
 
-void getAcelData() {                                                      // must be used only in the initialization state
-  sensors_event_t a, g, temp;
-  mpu.getEvent(&a, &g, &temp);
-  acel[0] = a.acceleration.x;
-  acel[1] = a.acceleration.y;
-  acel[2] = a.acceleration.z;
-}
-
 float_t getInertialData(){                                       // stores the sensor data
   sensors_event_t a, g, temp;
   mpu.getEvent(&a, &g, &temp);
@@ -106,7 +113,20 @@ float_t getInertialData(){                                       // stores the s
   gyro[1] = g.gyro.y;
   gyro[2] = g.gyro.z;
   t[curr] = millis();
-  return (t[curr]-t[!curr])*0.001;                                             // returns the time elapsed from the last call in seconds
+  float_t elapsed = (t[curr]-t[!curr])*0.001;                                             // returns the time elapsed from the last call in seconds
+  float_t app = a0.filter(acel[0], elapsed);
+  acel[0] = app;
+  app = a1.filter(acel[1], elapsed);
+  acel[1] = app;
+  app = a2.filter(acel[2], elapsed);
+  acel[2] = app;
+  app = g0.filter(gyro[0], elapsed);
+  gyro[0] = app;
+  app = g1.filter(gyro[1], elapsed);
+  gyro[1] = app;
+  app = g2.filter(gyro[2], elapsed);
+  gyro[2] = app;
+  return elapsed;
 }
 
 void updateState() {
@@ -114,9 +134,9 @@ void updateState() {
   float_t dt = getInertialData();
   float_t rotation[3], drot[9], rot_acel[3], trans_dir[9];
 
-  rotation[0] = (gyro[0]*dt)*(180/PI);
-  rotation[1] = (gyro[1]*dt)*(180/PI);
-  rotation[2] = (gyro[2]*dt)*(180/PI);
+  rotation[0] = (gyro[0]*dt);
+  rotation[1] = (gyro[1]*dt);
+  rotation[2] = (gyro[2]*dt);
 
   eul2Rotm(rotation, drot);                                               // calculating rotation matrix from old rotation matrix and gyroscope data
   matMul(state[curr].dir_mat,drot,state[!curr].dir_mat);
@@ -124,11 +144,21 @@ void updateState() {
   matTrans(trans_dir, state[curr].dir_mat);                               // transposing the rotation matrix from e-frame to b-frame to obtain the inverse from b-frame to e-frame
   matVecMul(rot_acel, trans_dir, acel);                                   // rotating the acceleratoion to e-frame
 
+  // Serial.printf("rot: ---- \n accel X : %f\naccel Y: %f\naccel Z: %f\n", rot_acel[0], rot_acel[1], rot_acel[2]);
+  // Serial.printf("vect module = %f\n", sqrt(rot_acel[0]*rot_acel[0] + rot_acel[1]*rot_acel[1]+ rot_acel[2]*rot_acel[2]));
+  // Serial.printf("aquired: ---- \n accel X : %f\naccel Y: %f\naccel Z: %f\n", acel[0], acel[1], acel[2]);
+  // Serial.printf("vect module = %f\n", sqrt(acel[0]*acel[0] + acel[1]*acel[1]+ acel[2]*acel[2]));
+
   rot_acel[0] -= init_g[0];
   rot_acel[1] -= init_g[1];
   rot_acel[2] -= init_g[2];
 
-  Serial.printf("accel X : %f\naccel Y: %f\naccel Z: %f\n\n", rot_acel[0], rot_acel[1], rot_acel[2]);  
+  // Serial.printf("rot no grav: ---- \n accel X : %f\naccel Y: %f\naccel Z: %f\n", rot_acel[0], rot_acel[1], rot_acel[2]);
+  // Serial.printf("vect module = %f\n", sqrt(rot_acel[0]*rot_acel[0] + rot_acel[1]*rot_acel[1]+ rot_acel[2]*rot_acel[2]));
+  
+  // Serial.printf("rot: accel X : %f\naccel Y: %f\naccel Z: %f\n", rot_acel[0], rot_acel[1], rot_acel[2]);
+  // Serial.printf("aquired: accel X : %f\naccel Y: %f\naccel Z: %f\n", acel[0], acel[1], acel[2]);
+  // Serial.printf("dt = %f\n", dt); 
 
   state[curr].vel[0] = state[!curr].vel[0] + rot_acel[0]*dt;              // calculating velocity and position
   state[curr].vel[1] = state[!curr].vel[1] + rot_acel[1]*dt;
@@ -168,8 +198,14 @@ void setup() {
     }
   }
   Serial.println("MPU6050 Found!");
+  a0.begin(FREQ_A,MIN_FREQ_A,BETA_A);
+  a1.begin(FREQ_A,MIN_FREQ_A,BETA_A);
+  a2.begin(FREQ_A,MIN_FREQ_A,BETA_A);
+  g0.begin(FREQ_G,MIN_FREQ_G,BETA_G);
+  g1.begin(FREQ_G,MIN_FREQ_G,BETA_G);
+  g2.begin(FREQ_G,MIN_FREQ_G,BETA_G);
   
-  mpu.setHighPassFilter(MPU6050_HIGHPASS_1_25_HZ);
+  mpu.setHighPassFilter(MPU6050_HIGHPASS_0_63_HZ);
   mpu.setMotionDetectionThreshold(10);
   mpu.setMotionDetectionDuration(20);
   mpu.setInterruptPinLatch(true);	// Keep it latched.  Will turn off when reinitialized.
@@ -188,13 +224,13 @@ void setup() {
   touchInterruptSetThresholdDirection(testingLower);
 
   //Serial.println("Starting gravity estimation hold your hand still for 1 second.");
-  //getAcelData();
-  updateState();
+  getInertialData();
   init_g[0] = acel[0];
   init_g[1] = acel[1];
   init_g[2] = acel[2];
 
   Serial.printf("accel X : %f\naccel Y: %f\naccel Z: %f\n", init_g[0], init_g[1], init_g[2]);
+  Serial.printf("vect module = %f\n", sqrt(init_g[0]*init_g[0] + init_g[1]*init_g[1]+ init_g[2]*init_g[2]));
   t[0] = millis();
   t[1] = t[0];
 }
@@ -205,16 +241,25 @@ void loop() {
     delay(1000);
   }
 
+  Serial.println("--------");
   updateState();
   
   // Serial.printf("accel X : %f\naccel Y: %f\naccel Z: %f\n", acel[0], acel[1], acel[2]);
 
+  Serial.printf("Vel X : %f\nVel Y: %f\nVel Z: %f\nPos X : %f\nPos Y: %f\nPos Z: %f\n", state[curr].vel[0], state[curr].vel[1], state[curr].vel[2], state[curr].pos[0], state[curr].pos[1], state[curr].pos[2]);
+  // Serial.print("Vel X: ");
+  // Serial.print("Vel Y: ");
+  // Serial.print("Vel Z: ");
   // Serial.print("Pos X: ");
-  // Serial.println(state[curr].pos[0]);
   // Serial.print("Pos Y: ");
-  // Serial.println(state[curr].pos[1]);
   // Serial.print("Pos Z: ");
-  // Serial.println(state[curr].pos[2]);
+  // Serial.println(float_t(state[curr].vel[0]));
+  // Serial.println(float_t(state[curr].vel[1]));
+  // Serial.println(float_t(state[curr].vel[2]));
+  // Serial.println(float_t(state[curr].pos[0]));
+  // Serial.println(float_t(state[curr].pos[1]));
+  // Serial.println(float_t(state[curr].pos[2]));
+  // Serial.println("");
   delay(1000);
   // if(BLEMidiServer.isConnected()) {     // If we've got a connection, we send an A4 during one second, at full velocity (127)
   //   Serial.println("connected");
