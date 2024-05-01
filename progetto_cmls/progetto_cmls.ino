@@ -1,11 +1,13 @@
 #include <Arduino.h>
 #include <BLEMidi.h>
+#include <Adafruit_MPU6050.h>
+#include <Adafruit_Sensor.h>
 #include <Wire.h>
 
 #define TOUCH 2
-#define SDA 26
-#define SCL 27
-
+#define SDA 21
+#define SCL 22
+#define MPU 0x68
 //the b-frame is the frame of the body while the e-frame is the frame of the environament
 
 typedef struct {
@@ -22,6 +24,8 @@ int threshold = 40;
 bool touchActive = false;
 bool lastTouchActive = false;
 bool testingLower = true;
+
+Adafruit_MPU6050 mpu;
 
 // ---- MATRIX OPERATIONS ----
 
@@ -85,34 +89,37 @@ void matTrans(float_t out[3], float_t in[3]) {                            // tra
 // ---- PHYSICAL OPERATIONS ----
 
 void getAcelData() {                                                      // must be used only in the initialization state
-  acel[0] = (Wire.read() << 8 | Wire.read())/16384.0;
-  acel[1] = (Wire.read() << 8 | Wire.read())/16384.0;
-  acel[2] = (Wire.read() << 8 | Wire.read())/16384.0;
+  sensors_event_t a, g, temp;
+  mpu.getEvent(&a, &g, &temp);
+  acel[0] = a.acceleration.x;
+  acel[1] = a.acceleration.y;
+  acel[2] = a.acceleration.z;
 }
 
-float_t getInertialData(uint8_t c){                                       // stores the sensor data
-  acel[0] = (Wire.read() << 8 | Wire.read())/16384.0;
-  acel[1] = (Wire.read() << 8 | Wire.read())/16384.0;
-  acel[2] = (Wire.read() << 8 | Wire.read())/16384.0;
-  gyro[0] = (Wire.read() << 8 | Wire.read())/131 + 0.56;
-  gyro[1] = (Wire.read() << 8 | Wire.read())/131 - 2;
-  gyro[2] = (Wire.read() << 8 | Wire.read())/131 + 0.79;
-  t[c] = millis();
-  return (t[c]-t[!c])*0.001;                                             // returns the time elapsed from the last call in seconds
+float_t getInertialData(){                                       // stores the sensor data
+  sensors_event_t a, g, temp;
+  mpu.getEvent(&a, &g, &temp);
+  acel[0] = a.acceleration.x;
+  acel[1] = a.acceleration.y;
+  acel[2] = a.acceleration.z;
+  gyro[0] = g.gyro.x;
+  gyro[1] = g.gyro.y;
+  gyro[2] = g.gyro.z;
+  t[curr] = millis();
+  return (t[curr]-t[!curr])*0.001;                                             // returns the time elapsed from the last call in seconds
 }
 
 void updateState() {
   curr = !curr;
-  float_t dt = getInertialData(curr);
+  float_t dt = getInertialData();
   float_t rotation[3], drot[9], rot_acel[3], trans_dir[9];
 
-  rotation[0] = (gyro[0]*dt)*2*PI;
-  rotation[1] = (gyro[1]*dt)*2*PI;
-  rotation[2] = (gyro[2]*dt)*2*PI;
+  rotation[0] = (gyro[0]*dt)*(180/PI);
+  rotation[1] = (gyro[1]*dt)*(180/PI);
+  rotation[2] = (gyro[2]*dt)*(180/PI);
 
   eul2Rotm(rotation, drot);                                               // calculating rotation matrix from old rotation matrix and gyroscope data
   matMul(state[curr].dir_mat,drot,state[!curr].dir_mat);
-
   
   matTrans(trans_dir, state[curr].dir_mat);                               // transposing the rotation matrix from e-frame to b-frame to obtain the inverse from b-frame to e-frame
   matVecMul(rot_acel, trans_dir, acel);                                   // rotating the acceleratoion to e-frame
@@ -120,6 +127,8 @@ void updateState() {
   rot_acel[0] -= init_g[0];
   rot_acel[1] -= init_g[1];
   rot_acel[2] -= init_g[2];
+
+  Serial.printf("accel X : %f\naccel Y: %f\naccel Z: %f\n\n", rot_acel[0], rot_acel[1], rot_acel[2]);  
 
   state[curr].vel[0] = state[!curr].vel[0] + rot_acel[0]*dt;              // calculating velocity and position
   state[curr].vel[1] = state[!curr].vel[1] + rot_acel[1]*dt;
@@ -151,8 +160,22 @@ void gotTouchEvent(){
 void setup() {
   Serial.begin(115200);
   Serial.println("Initializing bluetooth");
-  Wire.begin(SDA,SCL);
-
+  
+  if (!mpu.begin()) {
+    Serial.println("Failed to find MPU6050 chip");
+    while (1) {
+      delay(10);
+    }
+  }
+  Serial.println("MPU6050 Found!");
+  
+  mpu.setHighPassFilter(MPU6050_HIGHPASS_1_25_HZ);
+  mpu.setMotionDetectionThreshold(10);
+  mpu.setMotionDetectionDuration(20);
+  mpu.setInterruptPinLatch(true);	// Keep it latched.  Will turn off when reinitialized.
+  mpu.setInterruptPinPolarity(true);
+  mpu.setMotionInterrupt(true);
+  
   BLEMidiServer.begin("MI.MU gloves dei poveri");
   Serial.print("Waiting for connections");
   while(!BLEMidiServer.isConnected()) {
@@ -164,26 +187,16 @@ void setup() {
   touchAttachInterrupt(TOUCH, gotTouchEvent, threshold);
   touchInterruptSetThresholdDirection(testingLower);
 
-  Serial.print("Starting gravity estimation hold your hand still for 1 second.");
-  float_t elapsed = 0;
-  int16_t i = 0;
-  while (elapsed < 1){                                                    // initializing the gravity vector by getting data for a second and averaging it
-    getAcelData();
-    init_g[0] += acel[0];
-    init_g[1] += acel[1];
-    init_g[2] += acel[2];
-    elapsed += millis()*0.001;
-    i++;
-    delay(10);
-  }
-  init_g[0] /= i;
-  init_g[1] /= i;
-  init_g[2] /= i;
+  //Serial.println("Starting gravity estimation hold your hand still for 1 second.");
+  //getAcelData();
+  updateState();
+  init_g[0] = acel[0];
+  init_g[1] = acel[1];
+  init_g[2] = acel[2];
+
+  Serial.printf("accel X : %f\naccel Y: %f\naccel Z: %f\n", init_g[0], init_g[1], init_g[2]);
   t[0] = millis();
   t[1] = t[0];
-  Serial.print("Inital gravity calculation done. Used ");
-  Serial.print(i);
-  Serial.println(" accelerometer measurements");
 }
 
 void loop() {
@@ -191,12 +204,24 @@ void loop() {
     Serial.print(".");
     delay(1000);
   }
-  if(BLEMidiServer.isConnected()) {     // If we've got a connection, we send an A4 during one second, at full velocity (127)
-    Serial.println("connected");
-      BLEMidiServer.noteOn(1, 69, 127);
-      delay(1000);
-      BLEMidiServer.noteOff(1, 69, 127);      // Then we stop the note and make a delay of one second before returning to the beginning of the loop
-      delay(1000);
-  } else {Serial.println("not connected"); delay(1000);}
-  Serial.flush();
+
+  updateState();
+  
+  // Serial.printf("accel X : %f\naccel Y: %f\naccel Z: %f\n", acel[0], acel[1], acel[2]);
+
+  // Serial.print("Pos X: ");
+  // Serial.println(state[curr].pos[0]);
+  // Serial.print("Pos Y: ");
+  // Serial.println(state[curr].pos[1]);
+  // Serial.print("Pos Z: ");
+  // Serial.println(state[curr].pos[2]);
+  delay(1000);
+  // if(BLEMidiServer.isConnected()) {     // If we've got a connection, we send an A4 during one second, at full velocity (127)
+  //   Serial.println("connected");
+  //     BLEMidiServer.noteOn(1, 69, 127);
+  //     delay(1000);
+  //     BLEMidiServer.noteOff(1, 69, 127);      // Then we stop the note and make a delay of one second before returning to the beginning of the loop
+  //     delay(1000);
+  // } else {Serial.println("not connected"); delay(1000);}
+  // Serial.flush();
 }
