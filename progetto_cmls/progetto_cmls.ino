@@ -34,6 +34,11 @@ bool touchActive = false;
 bool lastTouchActive = false;
 bool testingLower = true;
 
+uint8_t note = 60;
+uint8_t note_tresh =3;
+uint8_t vel_val = 60;
+uint8_t vel_tresh =3;
+
 Adafruit_MPU6050 mpu;
 static OneEuroFilter a0;
 static OneEuroFilter a1;
@@ -187,6 +192,35 @@ void gotTouchEvent(){
   }
 }
 
+// ---- MIDI FUNCTIONS ----
+/*deve comparare la vecchia posizione con la nuova ma solo della posizione x e se la differenza è più grande/piccolo di un certo valore allora aggiorna
+la nota aumentandola; stessa cosa per le y con la velocità però.
+
+*/
+void notesFromPosition(){
+ bool is_higer = state[curr].pos[0] > state[!curr].pos[0]
+ float_t delta0 = is_higer ? state[curr].pos[0] - state[!curr].pos[0] : state[!curr].pos[0] - state[curr].pos[0];
+if (delta0 > note_tresh) {
+  int8_t var0 = int8_t(delta0 / note_tresh ); 
+  var0 *= is_higer ? 1 : -1 ; 
+  note += var0;
+}
+else {
+    int8_t pitch_w = int8_t((delta0/ note_tresh)*8191);
+    pitch_w = is_higer ? pitch_w : -pitch_w;
+   }
+
+   bool v_higer = state[curr].pos[1] > state[!curr].pos[1]
+ float_t delta1 = v_higer ? state[curr].pos[1] - state[!curr].pos[1] : state[!curr].pos[1] - state[curr].pos[1];
+if (delta1 > vel_tresh) {
+  int8_t var1 = int8_t(delta0 / note_tresh ); 
+  var1 *= v_higer ? 1 : -1 ; 
+  vel_val += var1;
+}
+
+
+}
+
 void setup() {
   Serial.begin(115200);
   Serial.println("Initializing bluetooth");
@@ -234,6 +268,7 @@ void setup() {
   t[0] = millis();
   t[1] = t[0];
 }
+
 
 void loop() {
   while(!BLEMidiServer.isConnected()) {
