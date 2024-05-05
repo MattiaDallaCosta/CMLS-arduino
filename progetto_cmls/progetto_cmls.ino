@@ -36,8 +36,6 @@ uint8_t note_tresh =3;
 uint8_t vel_val = 60;
 uint8_t vel_tresh =3;
 
-Adafruit_MPU6050 mpu;
-
 SimpleKalmanFilter vect(E_MEA,E_EST,NOISE);
 SimpleKalmanFilter g0(E_MEA2,E_EST2,NOISE2);
 SimpleKalmanFilter g1(E_MEA2,E_EST2,NOISE2);
@@ -157,10 +155,10 @@ void updateState() {
   rot_acel[1] = int8_t(rot_acel[1]*10)/10.0;
   rot_acel[2] = int8_t(rot_acel[2]*10)/10.0;
 
-  //Serial.printf("rotated \naccel values: %f --- %f --- %f\ngyro values: %f --- %f --- %f\n", rot_acel[0], rot_acel[1], rot_acel[2], gyro[0], gyro[1], gyro[2]);
-  //Serial.printf("vect module = %f\n", pre_mod);
-  //Serial.printf("no gravity vect module = %f\n", accel_mod);
-  //Serial.printf("corrected vect module = %f\n", accel_mod);
+  Serial.printf("rotated \naccel values: %f --- %f --- %f\ngyro values: %f --- %f --- %f\n", rot_acel[0], rot_acel[1], rot_acel[2], gyro[0], gyro[1], gyro[2]);
+  Serial.printf("vect module = %f\n", pre_mod);
+  Serial.printf("no gravity vect module = %f\n", accel_mod);
+  Serial.printf("corrected vect module = %f\n", corrected_mod);
   
   state[curr].vel[0] = int8_t(100*(state[!curr].vel[0] + rot_acel[0]*dt))/100.0;              // calculating velocity and position
   state[curr].vel[1] = int8_t(100*(state[!curr].vel[1] + rot_acel[1]*dt))/100.0;
@@ -194,11 +192,11 @@ void gotTouchEvent(){
 /*deve comparare la vecchia posizione con la nuova ma solo della posizione x e se la differenza è più grande/piccolo di un certo valore allora aggiorna
 la nota aumentandola; stessa cosa per le y con la velocità però.
 
-*/
+
 void notesFromPosition(){
  bool is_higer = state[curr].pos[0] > state[!curr].pos[0]
  float_t delta0 = is_higer ? state[curr].pos[0] - state[!curr].pos[0] : state[!curr].pos[0] - state[curr].pos[0];
-if (delta0 > note_tresh) {
+ if (delta0 > note_tresh) {
   int8_t var0 = int8_t(delta0 / note_tresh ); 
   var0 *= is_higer ? 1 : -1 ; 
   note += var0;
@@ -217,7 +215,7 @@ if (delta1 > vel_tresh) {
 }
 
 
-}
+}*/
 
 void setup() {
   Serial.begin(115200);
