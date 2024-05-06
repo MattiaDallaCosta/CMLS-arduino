@@ -16,12 +16,9 @@ This method based on touchInterruptSetThresholdDirection() is only available for
 
 // inertial data
 float_t acel[3] = {0, 0, 0}, gyro[2] = {0, 0}, init_g[3] = {0, 0, 0};
-float_t gyro_a[2];
 
 // output rotation x,y
 circ_array a0_smooth, a1_smooth;
-
-float_t angles[2];
 
 //current and previous time and index                                          
 uint32_t t[2];
@@ -41,6 +38,9 @@ int value = 2;
 // button state for trigger and buttons
 bool touch = 0;
 bool strip = 0;
+
+uint8_t midi_cc[4];
+uint8_t midi_note[2] = {0, 0};
 
 int args1[2] = {0, 0};
 int args2[2] = {T_BUTS, 0};
@@ -71,26 +71,30 @@ void getAccAngles(float_t in[3], float_t out[2]) {
   out[1] = atan2(in[1], pitch);
 }
 
-void getMidiVals(uint8_t midivals[2]) {
-  float dt = getInertialData();
-  float app[2];
+void getMidiCc() {
+  float_t dt = getInertialData();
+  float_t app[2], gyro_a[2], angles[2];
   getAccAngles(acel, app);
   gyro_a[0] = gyro[0]*dt;
   gyro_a[1] = gyro[1]*dt;
   angles[0] = (app[0]*0.95 + gyro_a[0]*0.05)*(180/PI);
   angles[1] = (app[1]*0.95 + gyro_a[1]*0.05)*(180/PI);
-  uint8_t midivals[2];
   app[0] = angles[0] > 90 ? 90 : angles[0]; 
   app[0] = app[0] < -90 ? -90 : app[0];
-  midivals[0] = 127 - int((app[0] + 90)*(127/180.0));
-  a0_smooth.insert(midivals[0]);
-  midivals[0] = a0_smooth.getValue();
+  midivals[curr*2] = 127 - int((app[0] + 90)*(127/180.0));
+  a0_smooth.insert(midivals[curr*2]);
+  midivals[curr*2] = a0_smooth.getValue();
 
   app[1] = angles[1] > 90 ? 90 : angles[1]; 
   app[1] = app[1] < -90 ? -90 : app[1];
-  midivals[1] = int((app[1] + 90)*(127/180.0));
-  a1_smooth.insert(midivals[1]);
-  midivals[1] = a1_smooth.getValue();
+  midivals[curr*2 + 1] = int((app[1] + 90)*(127/180.0));
+  a1_smooth.insert(midivals[curr*2 + 1]);
+  midi_cc[curr*2 + 1] = a1_smooth.getValue();
+}
+
+void getMidiNote() {
+  // float_t val = analogRead(33);
+  // midi_note[curr] = 3;
 }
 
 /* ---- TOUCH FUNCTIONS ---- */
@@ -158,10 +162,13 @@ void loop(){
     }
     Serial.println("");
   }
-  uint8_t midi[2];
-  getMidiVals(uint8_t midi);
-  // Serial.printf("roll: %i --- pitch: %i\n", midi[0], midi[1]);
+  getMidiCc();
+  getMidiNote();
+  // Serial.printf("roll: %i --- pitch: %i\n", midi_cc[curr_cc*2 + 0], midi_cc[curr_cc*2 + 1]);
   touchButton(&touch, TOUCH, t_tresh, empty, empty, (void*)args1);
   touchButton(&strip, T_BUTS, thresh1,  evaluate, empty,(void*)args2);
+  if(midi_cc[curr*2] != midi_cc[!curr*2]) BLEMidiServer.controlChange(1, 12, midi[0]);
+  if(midi_cc[curr*2 + 1] != midi_cc[!curr*2 + 1]) BLEMidiServer.controlChange(1, 13, midi[1]);
+  curr = !curr;
   delay(10);
 }
