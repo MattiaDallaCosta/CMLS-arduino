@@ -11,8 +11,9 @@ This method based on touchInterruptSetThresholdDirection() is only available for
 #include <Adafruit_Sensor.h>
 #include "circ_array.h"
 
-#define T_BUTS T2
-#define TOUCH T3
+#define T_BUTS 2  // second to last pin on the right from the top (usb plug on the bottom)
+#define TOUCH 15 // last pin on the right  from the top (usb plug on the bottom)
+#define FLEX 32 // 4th pin from the top left (usb plug on the bottom)
 
 // inertial data
 float_t acel[3] = {0, 0, 0}, gyro[2] = {0, 0}, init_g[3] = {0, 0, 0};
@@ -20,7 +21,7 @@ float_t acel[3] = {0, 0, 0}, gyro[2] = {0, 0}, init_g[3] = {0, 0, 0};
 // output rotation x,y
 circ_array a0_smooth, a1_smooth;
 
-//current and previous time and index                                          
+//current and previous time and index 
 uint32_t t[2];
 bool curr = 0;
 
@@ -39,8 +40,11 @@ int value = 2;
 bool touch = 0;
 bool strip = 0;
 
-uint8_t midi_cc[4];
+// midi cc and notes for current and previous instant
+uint8_t midi_cc[4] = {0, 0, 0, 0};
 uint8_t midi_note[2] = {0, 0};
+bool curr_n = 0;
+
 
 int args1[2] = {0, 0};
 int args2[2] = {T_BUTS, 0};
@@ -93,18 +97,26 @@ void getMidiCc() {
 }
 
 void getMidiNote() {
-  // float_t val = analogRead(33);
-  // midi_note[curr] = 3;
+  curr_n = !curr_n;
+  /* TODO:
+   *      read analog value from flex sensor at pin FLEX and convert it to note
+   */
+
+  // float_t val = analogRead(FLEX);
+  midi_note[curr_n] = 3;
 }
 
 /* ---- TOUCH FUNCTIONS ---- */
 
-void touchButton(bool *bt, uint8_t pin, uint8_t tresh, void (*when_pressed)(void*), void (*when_released)(void*), void* args){
-  if(touchRead(pin) < 55 && !*bt){
+void touchButton(bool *bt, uint8_t pin, uint8_t tresh, void (*when_pressed)(void*), void (*when_released)(void*), void (*when_released)(void*), void* args){
+  if(touchRead(pin) < tresh && !*bt){
     Serial.printf("touch pressed\n");
     (*when_pressed)(args);
     *bt = true;
-  } else if (touchRead(pin) > 55 && *bt){
+  } else if (touchRead(pin) < tresh && *bt) {
+    (*still_on)(args);
+  } 
+  else if (touchRead(pin) > tresh && *bt){
     Serial.printf("touch released\n");
     (*when_released)(args);
     *bt = false;
@@ -123,6 +135,22 @@ void empty(void* i){
   Serial.printf("empty function\n");
 }
 
+void sendNote(void* args){
+  getMidiNote();
+  BLEMidiServer.noteOn(1, midi_note[curr_n], 127);
+}
+
+void checkNote(void* args) {
+  getMidiNote();
+  if(midi_note[curr_n] != midi_note[!curr_n]){
+    BLEMidiServer.noteOff(1, midi_note[!curr_n], 127);
+    BLEMidiServer.noteOn(1, midi_note[curr_n], 127);
+  }
+}
+
+void stopNote(void* args){
+  BLEMidiServer.noteOff(1, midi_note[curr_n], 127);
+}
 /* ---- ARDUINO FUNCTIONS ---- */
 
 void setup() {
@@ -165,8 +193,8 @@ void loop(){
   getMidiCc();
   getMidiNote();
   // Serial.printf("roll: %i --- pitch: %i\n", midi_cc[curr_cc*2 + 0], midi_cc[curr_cc*2 + 1]);
-  touchButton(&touch, TOUCH, t_tresh, empty, empty, (void*)args1);
-  touchButton(&strip, T_BUTS, thresh1,  evaluate, empty,(void*)args2);
+  touchButton(&touch, TOUCH, t_tresh, empty, empty, empty, (void*)args1);
+  touchButton(&strip, T_BUTS, thresh1, evaluate, empty, empty,(void*)args2);
   if(midi_cc[curr*2] != midi_cc[!curr*2]) BLEMidiServer.controlChange(1, 12, midi[0]);
   if(midi_cc[curr*2 + 1] != midi_cc[!curr*2 + 1]) BLEMidiServer.controlChange(1, 13, midi[1]);
   curr = !curr;
