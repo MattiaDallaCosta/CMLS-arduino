@@ -4,9 +4,9 @@
 #include <Adafruit_Sensor.h>
 #include "circ_array.h"
 
-#define T_BUTS 2                                                // second to last pin on the right from the top (usb plug on the bottom)
-#define TOUCH 15                                                // last pin on the right  from the top (usb plug on the bottom)
-#define FLEX 32                                                 // 4th pin from the top left (usb plug on the bottom)
+#define T_BUTS 15                                               // last pin on the right from the top (usb plug on the bottom)
+#define TOUCH 33                                                // last pin on the right  from the top (usb plug on the bottom)
+#define FLEX 13                                                 // 4th pin from the top left (usb plug on the bottom)
 
 // inertial data
 float_t acel[3] = {0, 0, 0}, gyro[2] = {0, 0};
@@ -19,9 +19,9 @@ uint32_t t[2];
 bool curr = 0;
 
 // thresholds for the 3 buttons
-int thresh1 = 60;
-int thresh2 = 30;
-int thresh3 = 15;
+int thresh1 = 55;
+int thresh2 = 42;
+int thresh3 = 30;
 
 //thresholds for the trigger
 uint8_t t_tresh = 55;
@@ -86,16 +86,18 @@ void getMidiCc() {                                                // evaluates t
   midi_cc[curr*2 + 1] = int((app[1] + 90)*(127/180.0));
   a1_smooth.insert(midi_cc[curr*2 + 1]);
   midi_cc[curr*2 + 1] = a1_smooth.getValue();
+  //printf("midi_cc[0] = %i --- midi_cc[1] = %i\n", midi_cc[0], midi_cc[1]);
 }
 
-void getMidiNote() {
+void getMidiNote() {                                                                  // get the MIDI note from the resitor sensor
   curr_n = !curr_n;
-  /* TODO:
-   *      read analog value from flex sensor at pin FLEX and convert it to note
-   */
-
-  // float_t val = analogRead(FLEX);
-  midi_note[curr_n] = 3;
+  int out;
+  float_t val = analogRead(FLEX);                                                     //it get the analog value from the resistor sensor
+  if (val < 1800) val = 1800;                                                         //as the values are not so proportional to the flexion of the hand we have to fix it
+  else if (val > 3400) val = 3400;
+  out = int((val - 1800)/(1600/12));                                                  //it converts the fixed analog data in the 12 values of the notes
+  // Serial.printf("val = %f, out = %i\n", val, out);
+  midi_note[curr_n] =  out + octave;                                                  //the MIDI note is given by the note plus the octave that we chose from the 3 buttons
 }
 
 /* ---- TOUCH FUNCTIONS ---- */
@@ -114,19 +116,22 @@ void touchButton(bool *bt, uint8_t pin, uint8_t tresh, void (*when_pressed)(uint
   }
 }
 
+void empty(uint8_t ags){}
+
 void evaluate(uint8_t arg) {                                                          // behaviour of the 3 button touchpin when is being pressed (bot at the beginning and while hold down)
   uint16_t t_val = touchRead(arg);                                                    // gets the value of the pin (differet based on the button pressed)
   if(t_val > thresh2) long_octave += 2;                                               // adds the value of the button on the specific moment based on some thresholds (the input value oscilates and needs to be averaged for precision)
   else if (t_val > thresh3) long_octave += 1;
+  //Serial.printf("long_octave = %i --- touchread = %i\n", long_octave, t_val);
   idx++;
 }
 
 void setOctave(uint8_t arg) {                                                         // behaviour of the 3 button touchpin when is released
   float_t fval = long_octave/float_t(idx);                                            // averages the summed values from the prior function to obtain the value of the octave
-  octave = 48 + round(fval)*12;                                                     // sets the first note of the octave which will be playable (lowest octave starts on C3)
+  octave = 48 + int(round(fval))*12;                                                       // sets the first note of the octave which will be playable (lowest octave starts on C3)
+  Serial.printf("value = %i --- not rounded = %i --- idx = %i\nfirst note = %i", int(round(fval)), long_octave/idx, idx, octave);
   idx = 0;                                                                            // resets the values
   long_octave = 0;
-  Serial.printf("value = %i\n", octave);
 }
 
 void sendNote(uint8_t arg) {                                                          // behaviour of the trigger button when pressed
@@ -148,6 +153,8 @@ void stopNote(uint8_t arg) {                                                    
   Serial.printf("in StopNote\n");
   BLEMidiServer.noteOff(1, midi_note[curr_n], 127);                                   // sends noteOff of current note
 }
+
+
 
 /* ---- ARDUINO FUNCTIONS ---- */
 
@@ -189,8 +196,9 @@ void loop() {
     Serial.println("");
   }
   getMidiCc();                                                                        // evaluates CC values from IMU
-  Serial.printf("roll: %i --- pitch: %i\n", midi_cc[curr*2 + 0], midi_cc[curr*2 + 1]);
+  //Serial.printf("roll: %i --- pitch: %i\n", midi_cc[curr*2 + 0], midi_cc[curr*2 + 1]);
   touchButton(&strip, T_BUTS, thresh1, evaluate, evaluate, setOctave);                //sets the 2 touch inputs as buttons
+  //touchButton(&strip, T_BUTS, thresh1, evaluate, empty, setOctave);                //sets the 2 touch inputs as buttons
   touchButton(&touch, TOUCH, t_tresh, sendNote, checkNote, stopNote);
   if(midi_cc[curr*2] != midi_cc[!curr*2])                                             // sends midi CC for pitch
     BLEMidiServer.controlChange(1, 12, midi_cc[curr*2]);
