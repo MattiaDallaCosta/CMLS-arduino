@@ -1,6 +1,6 @@
 #pragma once
 #include <Arduino.h>
-#define C_SZ 100
+#define C_SZ 20
 
 
 class circ_array {

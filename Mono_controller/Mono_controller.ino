@@ -19,9 +19,9 @@ uint32_t t[2];
 bool curr = 0;
 
 // thresholds for the 3 buttons
-int thresh1 = 55;
-int thresh2 = 42;
-int thresh3 = 30;
+int thresh1 = 45;
+int thresh2 = 36;
+int thresh3 = 12;
 
 //thresholds for the trigger
 uint8_t t_tresh = 55;
@@ -120,6 +120,7 @@ void empty(uint8_t ags){}
 
 void evaluate(uint8_t arg) {                                                          // behaviour of the 3 button touchpin when is being pressed (bot at the beginning and while hold down)
   uint16_t t_val = touchRead(arg);                                                    // gets the value of the pin (differet based on the button pressed)
+  Serial.printf("touchread = %i\n", t_val);
   if(t_val > thresh2) long_octave += 2;                                               // adds the value of the button on the specific moment based on some thresholds (the input value oscilates and needs to be averaged for precision)
   else if (t_val > thresh3) long_octave += 1;
   //Serial.printf("long_octave = %i --- touchread = %i\n", long_octave, t_val);
@@ -129,7 +130,7 @@ void evaluate(uint8_t arg) {                                                    
 void setOctave(uint8_t arg) {                                                         // behaviour of the 3 button touchpin when is released
   float_t fval = long_octave/float_t(idx);                                            // averages the summed values from the prior function to obtain the value of the octave
   octave = 48 + int(round(fval))*12;                                                       // sets the first note of the octave which will be playable (lowest octave starts on C3)
-  Serial.printf("value = %i --- not rounded = %i --- idx = %i\nfirst note = %i", int(round(fval)), long_octave/idx, idx, octave);
+  Serial.printf("value = %i --- not rounded = %f --- idx = %i\nfirst note = %i\n", int(round(fval)), fval, idx, octave);
   idx = 0;                                                                            // resets the values
   long_octave = 0;
 }
@@ -137,11 +138,11 @@ void setOctave(uint8_t arg) {                                                   
 void sendNote(uint8_t arg) {                                                          // behaviour of the trigger button when pressed
   Serial.printf("in sendNote\n");             
   getMidiNote();                                                                      // evaluates the current midi note and sends a noteOn
-  BLEMidiServer.noteOn(1, octave + midi_note[curr_n], 127);
+  BLEMidiServer.noteOn(1,midi_note[curr_n], 127);
 }
 
 void checkNote(uint8_t arg) {                                                         // behaviour of the trigger button when is continued to be pressed
-  Serial.printf("in CheckNote\n");
+  //Serial.printf("in CheckNote\n");
   getMidiNote();                                                                      // evaluates the current note
   if(midi_note[curr_n] != midi_note[!curr_n]){                                        // if different from previous one send noteOf of the previous one and noteOn of current one
     BLEMidiServer.noteOff(1, midi_note[!curr_n], 127);
